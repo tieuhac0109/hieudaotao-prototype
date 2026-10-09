@@ -62,7 +62,7 @@ This evaluation clearly separates five distinct dimensions:
   - Achieved program learning outcomes.
   - Cumulative GPA at least "Trung bình".
   - Not under criminal prosecution or academic suspension at graduation review time.
-  - Submitted a request to Phòng Đào tạo for graduation consideration (for early or late graduation).
+  - Submitted a request to Phòng Đào tạo for graduation consideration.
 - **Model Answer Judgment**: `Correct`
 - **Evidence Verification Result**: `Warning / not fully automatically verified`
 - **Failure Mode**: `Cross-page quotation`
