@@ -1,8 +1,17 @@
 # Evaluation Protocol for HieuDaoTao Policy Intelligence Prototype
 
-This directory outlines the evaluation methodology and test case schema designed for validating the accuracy, groundedness, and reliability of the HieuDaoTao prototype on Vietnamese higher-education academic regulations.
+This directory outlines the evaluation methodology, test case schema, and historical evaluation records for validating the accuracy, groundedness, and reliability of the HieuDaoTao prototype on Vietnamese higher-education academic regulations.
 
 > **Important**: This evaluation framework is designed for structured qualitative and quantitative validation during pilot trials. No arbitrary benchmark percentages or marketing accuracy claims are made.
+
+---
+
+## Evaluation & Validation Records
+
+- **Sample Document Live Validation**: [`live-validation.md`](./live-validation.md)  
+  *First sample-document live validation*: Documents initial local runtime smoke test and single-query verification against the bundled 3-page sample regulation PDF (`quy-che-dao-tao-mau.pdf`).
+- **Real-Document 10-Question Evaluation 01**: [`real-document-evaluation-01.md`](./real-document-evaluation-01.md)  
+  *First real-document 10-question evaluation*: Evaluates 10 diverse policy questions against an 18-page public Vietnamese university academic regulation (*Trường Đại học Kinh tế - Đại học Đà Nẵng*, Decision No. 1284/QĐ-ĐHKT). Documents answer accuracy, citation correctness, cross-page verifier limitations, and verifier rejection of wrong-page model citations.
 
 ---
 

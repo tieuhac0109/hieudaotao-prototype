@@ -219,3 +219,12 @@ npm run typecheck # TypeScript type checking
 npm run lint      # ESLint static analysis
 npm run build     # Next.js production build validation
 ```
+
+### Real-Document Evaluation
+
+- A 10-question manual evaluation has been completed against an 18-page public Vietnamese university academic regulation.
+- All 10 answers were judged substantively correct against the source regulation.
+- 6/10 questions had all supporting evidence fully verified by the server-side verifier.
+- 3 cases exposed cross-page verification limitations (conservative false negatives where quotes spanned across page boundaries).
+- 1 case exposed wrong-page model attribution that was correctly rejected by the verifier.
+- See detailed report: [`evaluation/real-document-evaluation-01.md`](./evaluation/real-document-evaluation-01.md).
