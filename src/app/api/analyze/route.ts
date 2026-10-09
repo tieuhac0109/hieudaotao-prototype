@@ -103,12 +103,12 @@ export async function POST(req: NextRequest) {
     const processingTimeMs = Date.now() - startTime;
 
     if (err instanceof PdfProcessingError) {
-      console.warn(`[HDT_ANALYZE_WARN] req=${requestId} code=${err.code} msg=${err.message}`);
+      console.warn(`[HDT_ANALYZE_WARN] req=${requestId} code=${err.code} time=${processingTimeMs}ms`);
       return NextResponse.json({ error: err.message, code: err.code }, { status: 422 });
     }
 
     if (err instanceof ConfigurationError) {
-      console.error(`[HDT_ANALYZE_CONFIG_ERR] req=${requestId} msg=${err.message}`);
+      console.error(`[HDT_ANALYZE_CONFIG_ERR] req=${requestId} code=PROVIDER_NOT_CONFIGURED time=${processingTimeMs}ms`);
       return NextResponse.json(
         { error: 'The configured AI provider is unavailable.', code: 'PROVIDER_NOT_CONFIGURED' },
         { status: 503 }
@@ -116,7 +116,7 @@ export async function POST(req: NextRequest) {
     }
 
     if (err instanceof AIProviderError) {
-      console.error(`[HDT_ANALYZE_PROVIDER_ERR] req=${requestId} msg=${err.message}`);
+      console.error(`[HDT_ANALYZE_PROVIDER_ERR] req=${requestId} code=AI_PROVIDER_ERROR time=${processingTimeMs}ms`);
       return NextResponse.json(
         { error: 'AI provider request failed. Please try again.', code: 'AI_PROVIDER_ERROR' },
         { status: 502 }
@@ -124,19 +124,18 @@ export async function POST(req: NextRequest) {
     }
 
     if (err instanceof ModelOutputParseError) {
-      console.error(`[HDT_ANALYZE_PARSE_ERR] req=${requestId} msg=${err.message}`);
+      console.error(`[HDT_ANALYZE_PARSE_ERR] req=${requestId} code=MODEL_OUTPUT_INVALID time=${processingTimeMs}ms`);
       return NextResponse.json(
         { error: 'The model response could not be processed.', code: 'MODEL_OUTPUT_INVALID' },
         { status: 502 }
       );
     }
 
-    const safeMessage = 'An unexpected error occurred during document analysis.';
-    console.error(`[HDT_ANALYZE_ERR] req=${requestId} time=${processingTimeMs}ms error=${err instanceof Error ? err.message : String(err)}`);
+    console.error(`[HDT_ANALYZE_ERR] req=${requestId} code=INTERNAL_ERROR time=${processingTimeMs}ms`);
 
     return NextResponse.json(
       {
-        error: safeMessage,
+        error: 'An unexpected error occurred during document analysis.',
         code: 'INTERNAL_ERROR',
       },
       { status: 500 }

@@ -7,7 +7,7 @@ import { POST as analyzeHandler } from '../src/app/api/analyze/route';
 import * as providerModule from '../src/lib/ai/provider';
 import { AIProviderError, ConfigurationError } from '../src/lib/ai/errors';
 
-describe('API Route Hardening & Error Handling', () => {
+describe('API Route Hardening & Secret-Safe Error Handling', () => {
   const samplePdfPath = path.resolve(__dirname, '../public/sample-docs/quy-che-dao-tao-mau.pdf');
   const samplePdfBuffer = fs.readFileSync(samplePdfPath);
   const originalEnv = process.env;
@@ -89,9 +89,11 @@ describe('API Route Hardening & Error Handling', () => {
       expect(json.code).toBe('MISSING_FILE');
     });
 
-    it('should return safe 503 response when AI provider is not configured', async () => {
+    it('should return safe 503 response and sanitize server logs when AI provider is not configured', async () => {
+      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
       vi.spyOn(providerModule, 'getAIProvider').mockImplementation(() => {
-        throw new ConfigurationError('Vertex API key is not configured.');
+        throw new ConfigurationError('Vertex API key is not configured with sensitive key path /etc/secrets/token');
       });
 
       const formData = new FormData();
@@ -109,22 +111,33 @@ describe('API Route Hardening & Error Handling', () => {
       expect(json.error).toBe('The configured AI provider is unavailable.');
       expect(json.code).toBe('PROVIDER_NOT_CONFIGURED');
       expect(json).not.toHaveProperty('stack');
+
+      // Verify server logs are sanitized
+      expect(consoleErrorSpy).toHaveBeenCalled();
+      const loggedMessages = consoleErrorSpy.mock.calls.map((call) => call.join(' ')).join('\n');
+      expect(loggedMessages).toContain('code=PROVIDER_NOT_CONFIGURED');
+      expect(loggedMessages).toContain('[HDT_ANALYZE_CONFIG_ERR]');
+      expect(loggedMessages).not.toContain('/etc/secrets/token');
     });
 
-    it('should return safe 502 response when AI provider upstream call fails without leaking secrets', async () => {
+    it('should prove sensitive provider errors are absent from BOTH response and server logs', async () => {
+      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+      const sensitiveUpstreamMsg =
+        '403 Forbidden https://provider.example?key=SECRET123KEY\nAuthorization: Bearer SECRET_TOKEN';
+
       vi.spyOn(providerModule, 'getAIProvider').mockReturnValue({
         id: 'vertex',
         displayName: 'Vertex AI',
         analyzeDocument: vi.fn().mockRejectedValue(
-          new AIProviderError('Vertex AI generation request failed: 403 Forbidden with key SECRET123KEY')
+          new AIProviderError(sensitiveUpstreamMsg, { sensitive: 'data' })
         ),
       });
 
       const formData = new FormData();
       formData.append('question', 'Điều kiện tốt nghiệp là gì?');
       formData.append('file', new Blob([samplePdfBuffer], { type: 'application/pdf' }), 'test.pdf');
-      // Pass client model override to test that server ignores it
-      formData.append('model', 'untrusted-client-model-override');
+      formData.append('model', 'client-attempted-override');
 
       const req = new NextRequest('http://localhost:3000/api/analyze', {
         method: 'POST',
@@ -134,11 +147,58 @@ describe('API Route Hardening & Error Handling', () => {
       const res = await analyzeHandler(req);
       expect(res.status).toBe(502);
       const json = await res.json();
+
+      // 1. Assert public response safety
       expect(json.error).toBe('AI provider request failed. Please try again.');
       expect(json.code).toBe('AI_PROVIDER_ERROR');
-      // Ensure sensitive upstream string is NOT exposed to public client
-      expect(JSON.stringify(json)).not.toContain('SECRET123KEY');
-      expect(JSON.stringify(json)).not.toContain('403 Forbidden');
+      const responseString = JSON.stringify(json);
+      expect(responseString).not.toContain('SECRET123KEY');
+      expect(responseString).not.toContain('SECRET_TOKEN');
+      expect(responseString).not.toContain('https://provider.example');
+      expect(responseString).not.toContain('403 Forbidden');
+
+      // 2. Assert server log safety
+      expect(consoleErrorSpy).toHaveBeenCalled();
+      const loggedError = consoleErrorSpy.mock.calls.map((call) => call.join(' ')).join('\n');
+      expect(loggedError).toContain('[HDT_ANALYZE_PROVIDER_ERR]');
+      expect(loggedError).toContain('code=AI_PROVIDER_ERROR');
+      expect(loggedError).not.toContain('SECRET123KEY');
+      expect(loggedError).not.toContain('SECRET_TOKEN');
+      expect(loggedError).not.toContain('https://provider.example');
+      expect(loggedError).not.toContain('403 Forbidden');
+    });
+
+    it('should sanitize generic unexpected errors without leaking raw exception details to client or logs', async () => {
+      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+      vi.spyOn(providerModule, 'getAIProvider').mockImplementation(() => {
+        throw new Error('Database connection failed to postgresql://user:PASS123@db.internal:5432/hdt');
+      });
+
+      const formData = new FormData();
+      formData.append('question', 'Điều kiện tốt nghiệp là gì?');
+      formData.append('file', new Blob([samplePdfBuffer], { type: 'application/pdf' }), 'test.pdf');
+
+      const req = new NextRequest('http://localhost:3000/api/analyze', {
+        method: 'POST',
+        body: formData,
+      });
+
+      const res = await analyzeHandler(req);
+      expect(res.status).toBe(500);
+      const json = await res.json();
+      expect(json.error).toBe('An unexpected error occurred during document analysis.');
+      expect(json.code).toBe('INTERNAL_ERROR');
+
+      const responseString = JSON.stringify(json);
+      expect(responseString).not.toContain('PASS123');
+      expect(responseString).not.toContain('postgresql://');
+
+      const loggedError = consoleErrorSpy.mock.calls.map((call) => call.join(' ')).join('\n');
+      expect(loggedError).toContain('[HDT_ANALYZE_ERR]');
+      expect(loggedError).toContain('code=INTERNAL_ERROR');
+      expect(loggedError).not.toContain('PASS123');
+      expect(loggedError).not.toContain('postgresql://');
     });
   });
 });
