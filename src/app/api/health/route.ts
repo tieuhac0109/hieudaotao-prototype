@@ -12,20 +12,23 @@ export async function GET() {
       version: '1.0.0',
       activeProvider: diagnostics.activeProviderId,
       activeProviderName: diagnostics.activeProviderName,
-      activeDefaultModel: diagnostics.activeDefaultModel,
       isConfigured: diagnostics.activeProviderId === 'vertex'
         ? diagnostics.isVertexConfigured
         : diagnostics.isAnthropicConfigured,
       providers: {
         vertex: {
-          available: true,
-          configured: diagnostics.isVertexConfigured,
-          model: diagnostics.configuredVertexModel,
+          adapterImplemented: diagnostics.providers.vertex.adapterImplemented,
+          configured: diagnostics.providers.vertex.configured,
+          authMode: diagnostics.providers.vertex.authMode,
+          model: diagnostics.providers.vertex.model,
+          liveTested: diagnostics.providers.vertex.liveTested,
         },
         anthropic: {
-          available: true,
-          configured: diagnostics.isAnthropicConfigured,
-          model: diagnostics.configuredAnthropicModel,
+          adapterImplemented: diagnostics.providers.anthropic.adapterImplemented,
+          configured: diagnostics.providers.anthropic.configured,
+          authMode: diagnostics.providers.anthropic.authMode,
+          model: diagnostics.providers.anthropic.model,
+          liveTested: diagnostics.providers.anthropic.liveTested,
         },
       },
     },

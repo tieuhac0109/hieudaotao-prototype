@@ -1,6 +1,7 @@
 import { z } from 'zod';
+import { ModelOutputParseError } from '../ai/errors';
 
-export const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024; // 10 MB limit for Vercel/Node environment
+export const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024; // 10 MB limit
 export const ALLOWED_MIME_TYPES = ['application/pdf'] as const;
 
 export const QuestionSchema = z
@@ -31,8 +32,8 @@ export type ModelOutputParsed = z.infer<typeof ModelOutputSchema>;
  * Handles markdown code block stripping and provides clean error reporting.
  */
 export function parseAndValidateModelOutput(rawText: string): ModelOutputParsed {
-  if (!rawText || typeof rawText !== 'string') {
-    throw new Error('Model returned an empty response.');
+  if (!rawText || typeof rawText !== 'string' || !rawText.trim()) {
+    throw new ModelOutputParseError('Model returned an empty response.', rawText);
   }
 
   // Remove markdown code fences if model wrapped JSON in ```json ... ```
@@ -41,7 +42,7 @@ export function parseAndValidateModelOutput(rawText: string): ModelOutputParsed 
     cleaned = cleaned.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim();
   }
 
-  // Sometimes models include text before or after the JSON block, extract the outermost JSON object:
+  // Extract outermost JSON object
   const firstBrace = cleaned.indexOf('{');
   const lastBrace = cleaned.lastIndexOf('}');
   if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
@@ -53,13 +54,13 @@ export function parseAndValidateModelOutput(rawText: string): ModelOutputParsed 
     parsedJson = JSON.parse(cleaned);
   } catch (err) {
     const errorMsg = err instanceof Error ? err.message : 'Unknown JSON syntax error';
-    throw new Error(`Failed to parse AI output as JSON: ${errorMsg}`);
+    throw new ModelOutputParseError(`Failed to parse AI output as JSON: ${errorMsg}`, rawText);
   }
 
   const result = ModelOutputSchema.safeParse(parsedJson);
   if (!result.success) {
     const issues = result.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ');
-    throw new Error(`AI output did not match expected structure: ${issues}`);
+    throw new ModelOutputParseError(`AI output did not match expected structure: ${issues}`, rawText);
   }
 
   return result.data;

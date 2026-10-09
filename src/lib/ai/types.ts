@@ -25,7 +25,6 @@ export interface DocumentContent {
 export interface AnalyzeDocumentInput {
   question: string;
   document: DocumentContent;
-  model?: string;
 }
 
 export interface RawEvidenceItem {
@@ -37,7 +36,6 @@ export interface RawEvidenceItem {
 
 export interface EvidenceItem extends RawEvidenceItem {
   verified: boolean;
-  matchScore?: number;
 }
 
 export interface RawModelOutput {
@@ -65,11 +63,10 @@ export interface AnalyzeDocumentResult {
 export interface AIProvider {
   readonly id: string;
   readonly displayName: string;
-  readonly defaultModel: string;
 
   /**
    * Analyzes an academic regulation document and answers a user question.
-   * Returns structured output with grounded evidence and answerability state.
+   * Model is determined server-side from environment configuration.
    */
   analyzeDocument(input: AnalyzeDocumentInput): Promise<RawModelOutput & { provider: string; model: string }>;
 }

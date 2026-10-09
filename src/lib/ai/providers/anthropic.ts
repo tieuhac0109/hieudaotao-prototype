@@ -3,32 +3,41 @@ import { AIProvider, AnalyzeDocumentInput, RawModelOutput } from '../types';
 import { ACADEMIC_POLICY_SYSTEM_PROMPT } from '../system-prompt';
 import { formatDocumentForPrompt } from '../../documents/pdf';
 import { parseAndValidateModelOutput } from '../../validation/input';
+import { ConfigurationError, AIProviderError } from '../errors';
 
+/**
+ * Anthropic Claude Provider Adapter.
+ *
+ * Future-ready adapter: Architecturally implemented for future Claude activation.
+ * Requires both ANTHROPIC_API_KEY and ANTHROPIC_MODEL to be explicitly configured.
+ * Does NOT guess or hard-code a default Claude model.
+ */
 export class AnthropicProvider implements AIProvider {
   public readonly id = 'anthropic';
   public readonly displayName = 'Anthropic Claude';
-  public readonly defaultModel = 'claude-3-7-sonnet-20250219';
 
-  private resolveApiKey(): string | undefined {
-    return process.env.ANTHROPIC_API_KEY;
+  private resolveApiKey(): string {
+    const apiKey = process.env.ANTHROPIC_API_KEY;
+    if (!apiKey || !apiKey.trim()) {
+      throw new ConfigurationError(
+        'Anthropic provider is not configured yet. Set ANTHROPIC_API_KEY in your environment variables to enable Anthropic Claude.'
+      );
+    }
+    return apiKey.trim();
   }
 
-  private resolveModel(requestedModel?: string): string {
-    return (
-      requestedModel ||
-      process.env.ANTHROPIC_MODEL ||
-      this.defaultModel
-    );
+  private resolveModel(): string {
+    const model = process.env.ANTHROPIC_MODEL;
+    if (!model || !model.trim()) {
+      throw new ConfigurationError(
+        'Anthropic provider requires ANTHROPIC_MODEL to be set to an active model available to your Anthropic account.'
+      );
+    }
+    return model.trim();
   }
 
   private createClient(): Anthropic {
     const apiKey = this.resolveApiKey();
-
-    if (!apiKey) {
-      throw new Error(
-        'Anthropic provider is not configured yet. Set ANTHROPIC_API_KEY in your environment variables to enable Anthropic Claude.'
-      );
-    }
 
     return new Anthropic({
       apiKey: apiKey,
@@ -39,7 +48,7 @@ export class AnthropicProvider implements AIProvider {
     input: AnalyzeDocumentInput
   ): Promise<RawModelOutput & { provider: string; model: string }> {
     const anthropic = this.createClient();
-    const modelName = this.resolveModel(input.model);
+    const modelName = this.resolveModel();
 
     const formattedDoc = formatDocumentForPrompt(input.document);
 
@@ -51,7 +60,7 @@ ${input.question}
 
 INSTRUCTIONS:
 Analyze the document above and answer the question according to the institutional policy intelligence guidelines.
-Ensure that EVERY claim is accompanied by exact verbatim quoted passages with accurate 1-based page numbers matching the [PAGE X] headers.
+Ensure that EVERY substantive claim is accompanied by exact verbatim quoted passages with accurate 1-based page numbers matching the [PAGE X] headers.
 Return ONLY valid JSON matching the required schema.`;
 
     let messageResponse;
@@ -69,7 +78,7 @@ Return ONLY valid JSON matching the required schema.`;
       });
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
-      throw new Error(`Anthropic generation request failed: ${msg}`);
+      throw new AIProviderError(`Anthropic generation request failed: ${msg}`, err);
     }
 
     const textContent = messageResponse.content
@@ -77,8 +86,8 @@ Return ONLY valid JSON matching the required schema.`;
       .map((block) => ('text' in block ? block.text : ''))
       .join('\n');
 
-    if (!textContent) {
-      throw new Error('Anthropic Claude returned an empty response.');
+    if (!textContent || !textContent.trim()) {
+      throw new AIProviderError('Anthropic Claude returned an empty response.');
     }
 
     const parsed = parseAndValidateModelOutput(textContent);

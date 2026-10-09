@@ -1,13 +1,9 @@
 import { AIProvider } from './types';
 import { VertexProvider } from './providers/vertex';
 import { AnthropicProvider } from './providers/anthropic';
+import { ConfigurationError } from './errors';
 
-export class ConfigurationError extends Error {
-  constructor(message: string, public readonly code: string = 'CONFIGURATION_ERROR') {
-    super(message);
-    this.name = 'ConfigurationError';
-  }
-}
+export * from './errors';
 
 /**
  * Factory to retrieve the active AI Provider based on environment configuration or explicit ID.
@@ -35,28 +31,73 @@ export function getAIProvider(providerId?: string): AIProvider {
 
 /**
  * Returns non-secret diagnostics about provider configuration for transparency.
+ * Honestly distinguishes adapter implementation from credential configuration and live testing.
  */
 export function getProviderConfigDiagnostics(): {
   activeProviderId: string;
   activeProviderName: string;
-  activeDefaultModel: string;
   isVertexConfigured: boolean;
   isAnthropicConfigured: boolean;
   configuredVertexModel: string;
-  configuredAnthropicModel: string;
+  configuredAnthropicModel: string | null;
+  providers: {
+    vertex: {
+      adapterImplemented: boolean;
+      configured: boolean;
+      authMode: string;
+      model: string;
+      liveTested: boolean;
+    };
+    anthropic: {
+      adapterImplemented: boolean;
+      configured: boolean;
+      authMode: string;
+      model: string | null;
+      liveTested: boolean;
+    };
+  };
 } {
   const activeId = (process.env.AI_PROVIDER || 'vertex').toLowerCase().trim();
   const isVertex = activeId === 'vertex' || activeId === 'google' || activeId === 'gemini';
 
+  const isVertexConfigured = !!(
+    (process.env.VERTEX_API_KEY && process.env.VERTEX_API_KEY.trim()) ||
+    (process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY.trim()) ||
+    (process.env.GOOGLE_API_KEY && process.env.GOOGLE_API_KEY.trim())
+  );
+
+  const isAnthropicConfigured = !!(
+    process.env.ANTHROPIC_API_KEY &&
+    process.env.ANTHROPIC_API_KEY.trim() &&
+    process.env.ANTHROPIC_MODEL &&
+    process.env.ANTHROPIC_MODEL.trim()
+  );
+
+  const vertexModel = (process.env.VERTEX_MODEL || process.env.GEMINI_MODEL || 'gemini-2.5-flash').trim();
+  const anthropicModel = process.env.ANTHROPIC_MODEL ? process.env.ANTHROPIC_MODEL.trim() : null;
+
   return {
     activeProviderId: isVertex ? 'vertex' : activeId === 'anthropic' ? 'anthropic' : activeId,
     activeProviderName: isVertex ? 'Vertex AI' : activeId === 'anthropic' ? 'Anthropic Claude' : activeId,
-    activeDefaultModel: isVertex
-      ? process.env.VERTEX_MODEL || 'gemini-2.5-flash'
-      : process.env.ANTHROPIC_MODEL || 'claude-3-7-sonnet-20250219',
-    isVertexConfigured: !!(process.env.VERTEX_API_KEY || process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY),
-    isAnthropicConfigured: !!process.env.ANTHROPIC_API_KEY,
-    configuredVertexModel: process.env.VERTEX_MODEL || 'gemini-2.5-flash',
-    configuredAnthropicModel: process.env.ANTHROPIC_MODEL || 'claude-3-7-sonnet-20250219',
+    isVertexConfigured,
+    isAnthropicConfigured,
+    configuredVertexModel: vertexModel,
+    configuredAnthropicModel: anthropicModel,
+    providers: {
+      vertex: {
+        adapterImplemented: true,
+        configured: isVertexConfigured,
+        authMode: 'Vertex AI Express Mode (API Key)',
+        model: vertexModel,
+        liveTested: false, // Remains false until live inference is executed
+      },
+      anthropic: {
+        adapterImplemented: true,
+        configured: isAnthropicConfigured,
+        authMode: 'API Key (ANTHROPIC_API_KEY + ANTHROPIC_MODEL)',
+        model: anthropicModel,
+        liveTested: false,
+      },
+    },
   };
 }

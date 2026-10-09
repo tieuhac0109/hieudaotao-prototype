@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { extractPdfDocument, PdfProcessingError } from '@/lib/documents/pdf';
-import { getAIProvider, ConfigurationError } from '@/lib/ai/provider';
+import {
+  getAIProvider,
+  ConfigurationError,
+  AIProviderError,
+  ModelOutputParseError,
+} from '@/lib/ai/provider';
 import { verifyEvidenceList } from '@/lib/verification/evidence';
 import { QuestionSchema } from '@/lib/validation/input';
 import { AnalyzeDocumentResult } from '@/lib/ai/types';
@@ -13,7 +18,7 @@ export async function POST(req: NextRequest) {
     const contentType = req.headers.get('content-type') || '';
     if (!contentType.includes('multipart/form-data')) {
       return NextResponse.json(
-        { error: 'Invalid Content-Type. Request must be multipart/form-data with file and question.' },
+        { error: 'Invalid Content-Type. Request must be multipart/form-data with file and question.', code: 'INVALID_CONTENT_TYPE' },
         { status: 400 }
       );
     }
@@ -21,7 +26,6 @@ export async function POST(req: NextRequest) {
     const formData = await req.formData();
     const file = formData.get('file');
     const questionRaw = formData.get('question');
-    const modelOverride = formData.get('model');
 
     // 1. Validate question
     const questionValidation = QuestionSchema.safeParse(questionRaw);
@@ -48,17 +52,16 @@ export async function POST(req: NextRequest) {
 
     const docContent = await extractPdfDocument(buffer, filename, mimeType);
 
-    // 4. Select AI Provider via Provider Factory
+    // 4. Select AI Provider via Provider Factory (Model is determined strictly server-side)
     const provider = getAIProvider();
 
     // 5. Call Provider to analyze document with grounded instructions
     const modelResult = await provider.analyzeDocument({
       question,
       document: docContent,
-      model: typeof modelOverride === 'string' && modelOverride.trim() ? modelOverride.trim() : undefined,
     });
 
-    // 6. Perform server-side evidence quotation verification
+    // 6. Perform server-side conservative evidence quotation verification
     const verifiedEvidence = verifyEvidenceList(modelResult.evidence, docContent.pages);
 
     const processingTimeMs = Date.now() - startTime;
@@ -106,17 +109,35 @@ export async function POST(req: NextRequest) {
 
     if (err instanceof ConfigurationError) {
       console.error(`[HDT_ANALYZE_CONFIG_ERR] req=${requestId} msg=${err.message}`);
-      return NextResponse.json({ error: err.message, code: err.code }, { status: 503 });
+      return NextResponse.json(
+        { error: 'The configured AI provider is unavailable.', code: 'PROVIDER_NOT_CONFIGURED' },
+        { status: 503 }
+      );
     }
 
-    const message = err instanceof Error ? err.message : 'An unexpected error occurred during document analysis.';
-    console.error(`[HDT_ANALYZE_ERR] req=${requestId} time=${processingTimeMs}ms error=${message}`);
+    if (err instanceof AIProviderError) {
+      console.error(`[HDT_ANALYZE_PROVIDER_ERR] req=${requestId} msg=${err.message}`);
+      return NextResponse.json(
+        { error: 'AI provider request failed. Please try again.', code: 'AI_PROVIDER_ERROR' },
+        { status: 502 }
+      );
+    }
+
+    if (err instanceof ModelOutputParseError) {
+      console.error(`[HDT_ANALYZE_PARSE_ERR] req=${requestId} msg=${err.message}`);
+      return NextResponse.json(
+        { error: 'The model response could not be processed.', code: 'MODEL_OUTPUT_INVALID' },
+        { status: 502 }
+      );
+    }
+
+    const safeMessage = 'An unexpected error occurred during document analysis.';
+    console.error(`[HDT_ANALYZE_ERR] req=${requestId} time=${processingTimeMs}ms error=${err instanceof Error ? err.message : String(err)}`);
 
     return NextResponse.json(
       {
-        error: message,
+        error: safeMessage,
         code: 'INTERNAL_ERROR',
-        hint: 'Verify that your AI provider API key is set and the PDF contains selectable text.',
       },
       { status: 500 }
     );
