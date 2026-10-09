@@ -7,7 +7,7 @@ import {
 import { VertexProvider } from '../src/lib/ai/providers/vertex';
 import { AnthropicProvider } from '../src/lib/ai/providers/anthropic';
 
-describe('AI Provider Factory & Configuration Hardening', () => {
+describe('AI Provider Factory & Configuration Diagnostics', () => {
   const originalEnv = process.env;
 
   beforeEach(() => {
@@ -129,7 +129,7 @@ describe('AI Provider Factory & Configuration Hardening', () => {
     ).rejects.toThrowError(/ANTHROPIC_MODEL to be set/);
   });
 
-  it('should return honest provider diagnostics distinguishing implemented vs configured', () => {
+  it('should honestly report liveValidated=true for Vertex and liveValidated=false for Anthropic', () => {
     delete process.env.VERTEX_API_KEY;
     delete process.env.GEMINI_API_KEY;
     delete process.env.GOOGLE_API_KEY;
@@ -143,17 +143,18 @@ describe('AI Provider Factory & Configuration Hardening', () => {
     expect(diagnostics.isVertexConfigured).toBe(false);
     expect(diagnostics.isAnthropicConfigured).toBe(false);
 
-    // Provider details
+    // Vertex details
     expect(diagnostics.providers.vertex.adapterImplemented).toBe(true);
     expect(diagnostics.providers.vertex.configured).toBe(false);
-    expect(diagnostics.providers.vertex.liveTested).toBe(false);
+    expect(diagnostics.providers.vertex.liveValidated).toBe(true); // Recorded milestone
 
+    // Anthropic details
     expect(diagnostics.providers.anthropic.adapterImplemented).toBe(true);
     expect(diagnostics.providers.anthropic.configured).toBe(false);
-    expect(diagnostics.providers.anthropic.liveTested).toBe(false);
+    expect(diagnostics.providers.anthropic.liveValidated).toBe(false); // Unvalidated
   });
 
-  it('should accurately report configured=true when credentials and models are set', () => {
+  it('should accurately reflect runtime configured state when environment variables are set', () => {
     process.env.VERTEX_API_KEY = 'test-vertex-key';
     process.env.VERTEX_MODEL = 'gemini-2.5-flash';
     process.env.ANTHROPIC_API_KEY = 'test-anthropic-key';
@@ -162,10 +163,12 @@ describe('AI Provider Factory & Configuration Hardening', () => {
     const diagnostics = getProviderConfigDiagnostics();
     expect(diagnostics.isVertexConfigured).toBe(true);
     expect(diagnostics.providers.vertex.configured).toBe(true);
+    expect(diagnostics.providers.vertex.liveValidated).toBe(true);
     expect(diagnostics.providers.vertex.model).toBe('gemini-2.5-flash');
 
     expect(diagnostics.isAnthropicConfigured).toBe(true);
     expect(diagnostics.providers.anthropic.configured).toBe(true);
+    expect(diagnostics.providers.anthropic.liveValidated).toBe(false);
     expect(diagnostics.providers.anthropic.model).toBe('claude-3-5-sonnet-20241022');
   });
 });

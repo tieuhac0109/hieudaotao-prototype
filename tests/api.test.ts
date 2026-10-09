@@ -23,7 +23,7 @@ describe('API Route Hardening & Secret-Safe Error Handling', () => {
   });
 
   describe('GET /api/health', () => {
-    it('should return honest provider status distinguishing implemented vs configured', async () => {
+    it('should return honest provider status distinguishing implemented vs configured vs liveValidated', async () => {
       delete process.env.VERTEX_API_KEY;
       delete process.env.ANTHROPIC_API_KEY;
 
@@ -32,13 +32,37 @@ describe('API Route Hardening & Secret-Safe Error Handling', () => {
 
       const json = await response.json();
       expect(json.status).toBe('healthy');
+
+      // Vertex: implemented, unconfigured in test env, live validated milestone
       expect(json.prototype.providers.vertex.adapterImplemented).toBe(true);
       expect(json.prototype.providers.vertex.configured).toBe(false);
-      expect(json.prototype.providers.vertex.liveTested).toBe(false);
+      expect(json.prototype.providers.vertex.liveValidated).toBe(true);
 
+      // Anthropic: implemented, unconfigured in test env, unvalidated
       expect(json.prototype.providers.anthropic.adapterImplemented).toBe(true);
       expect(json.prototype.providers.anthropic.configured).toBe(false);
-      expect(json.prototype.providers.anthropic.liveTested).toBe(false);
+      expect(json.prototype.providers.anthropic.liveValidated).toBe(false);
+
+      // Verify no secrets, billing IDs, or internal tokens exist in response
+      const jsonStr = JSON.stringify(json);
+      expect(jsonStr).not.toContain('secret_val_123');
+      expect(jsonStr).not.toContain('Bearer');
+      expect(jsonStr).not.toContain('PRIVATE_KEY');
+    });
+
+    it('should never expose real secret values when credentials are configured in runtime', async () => {
+      process.env.VERTEX_API_KEY = 'secret_vertex_key_999';
+      process.env.ANTHROPIC_API_KEY = 'secret_anthropic_key_888';
+
+      const response = await healthHandler();
+      const json = await response.json();
+
+      expect(json.prototype.providers.vertex.configured).toBe(true);
+      expect(json.prototype.providers.anthropic.configured).toBe(false); // Anthropic still needs model
+
+      const jsonStr = JSON.stringify(json);
+      expect(jsonStr).not.toContain('secret_vertex_key_999');
+      expect(jsonStr).not.toContain('secret_anthropic_key_888');
     });
   });
 

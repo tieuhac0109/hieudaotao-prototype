@@ -1,7 +1,7 @@
 # HieuDaoTao — Academic Policy Intelligence Prototype V1
 
 > **Provider-Agnostic Policy Reasoning with Server-Side Evidence Verification**  
-> Active Provider: **Vertex AI / Gemini** (Express Mode API Key) · Future-Ready: **Anthropic Claude Adapter**
+> Active Provider: **Vertex AI / Gemini** (Express Mode API Key · Live Validated Locally) · Future-Ready: **Anthropic Claude Adapter**
 
 ---
 
@@ -11,8 +11,8 @@
 
 ### Core Principles
 1. **Conservative Evidence Verification**: Quoted passages must match the source page text completely under safe normalization. Any fabricated prefix, suffix, or altered condition results in `verified: false`.
-2. **Provider-Agnostic Architecture**: Implements a clean provider interface (`AIProvider`). Vertex AI is active; an Anthropic Claude adapter is implemented in code and ready for future activation.
-3. **Transparent Honesty**: Never claims live connectivity until real inferences succeed. Never fakes model metadata or provider responses.
+2. **Provider-Agnostic Architecture**: Implements a clean provider interface (`AIProvider`). Vertex AI is active and live-validated; an Anthropic Claude adapter is implemented in code and ready for future activation.
+3. **Transparent Honesty**: Accurately distinguishes implemented adapters, runtime environment configuration, and recorded validation milestones without claiming unverified continuous live probing.
 4. **Zero Client-Side Secret Leakage**: All credentials and model configurations remain strictly server-side. Public requests cannot select arbitrary model IDs.
 
 ---
@@ -20,7 +20,7 @@
 ## 2. Technical Pipeline
 
 ```
-[ Upload PDF ] (Text-based academic regulation, ≤ 10 MB)
+[ Upload PDF ] (Text-based academic regulation, ≤ 4.5 MB)
             ↓
 [ Text Extraction & Page Tracking ] (unpdf, 1-based page indices)
             ↓
@@ -88,19 +88,20 @@ The application UI and API routes contain **no provider-specific business logic*
 
 ## 4. Current Active Provider: Vertex AI / Gemini
 
-- **Status**: Adapter implemented and active by default (`AI_PROVIDER=vertex`). Real inference requires configuring a valid `VERTEX_API_KEY`.
-- **Authentication Mode**: Supports **Vertex AI Express Mode API-key authentication** (`VERTEX_API_KEY` or `GEMINI_API_KEY`) via the official `@google/genai` SDK.
-- **Model Configuration**: Default is `gemini-2.5-flash`, configurable server-side via `VERTEX_MODEL`.
-- **Future Architecture Note**: Standard Google Cloud project/service-account authentication can later be added inside `VertexProvider` if required by enterprise infrastructure.
+- **Implementation**: Adapter implemented in `src/lib/ai/providers/vertex.ts` via `@google/genai`.
+- **Live Validation Milestone**: Real local end-to-end inference has been successfully executed and validated using `gemini-2.5-flash` against the bundled 3-page academic regulation PDF. The reasoning produced source-grounded citations on Page 3 (*Điều 18, Khoản 1*) that passed server-side quotation verification (see [`evaluation/live-validation.md`](./evaluation/live-validation.md)).
+- **Authentication Mode**: Supports **Vertex AI Express Mode API-key authentication** (`VERTEX_API_KEY` or `GEMINI_API_KEY`).
+- **Model Configuration**: Configurable server-side via `VERTEX_MODEL` (default: `gemini-2.5-flash`).
+- **Future Architecture Note**: Standard Google Cloud project/service-account authentication can later be added inside `VertexProvider` if required by infrastructure.
 
 ---
 
 ## 5. Future Provider: Anthropic Claude Adapter
 
-- **Status**: Adapter implemented in `src/lib/ai/providers/anthropic.ts` using `@anthropic-ai/sdk`. Currently **unconfigured and untested** until real credentials are provided.
+- **Status**: Adapter implemented in `src/lib/ai/providers/anthropic.ts` using `@anthropic-ai/sdk`. Currently **unconfigured and unvalidated** in live runtime.
 - **Requirements when activated**: When `AI_PROVIDER=anthropic`, the application requires both:
   - `ANTHROPIC_API_KEY`: A valid Anthropic API key.
-  - `ANTHROPIC_MODEL`: `ANTHROPIC_MODEL` must be set to an active model available to the configured Anthropic account.
+  - `ANTHROPIC_MODEL`: Must be set to an active model available to the configured Anthropic account.
 - **Safety**: If either variable is missing when Anthropic is active, the server returns a clear `ConfigurationError` without faking Claude responses.
 
 ---
@@ -178,7 +179,7 @@ HieuDaoTao distinguishes strictly between **model-generated claims** and **serve
 
 - **Server-Side Secrets**: All API credentials and model configurations are resolved exclusively on the server.
 - **No Client Model Override**: `POST /api/analyze` determines the model only from server environment variables. Public requests cannot override or specify model IDs.
-- **Sanitized Error Responses**: Upstream provider failures return safe messages (`AI provider request failed. Please try again.`, `The configured AI provider is unavailable.`, `The model response could not be processed.`). Raw provider stack traces, headers, and credentials are never leaked.
+- **Sanitized Error Responses & Logs**: Upstream provider failures return safe messages (`AI provider request failed. Please try again.`, `The configured AI provider is unavailable.`, `The model response could not be processed.`). Raw provider stack traces, headers, URLs with keys, and credentials are never leaked in responses or server logs.
 - **Ephemeral Processing**: PDF buffers and extracted text are processed in memory and discarded upon request completion. No documents are stored.
 
 ---
@@ -191,10 +192,29 @@ HieuDaoTao distinguishes strictly between **model-generated claims** and **serve
 
 ---
 
-## 11. Testing & Validation
+## 11. Deployment Readiness
+
+The prototype is ready for initial Vercel deployment once the owner manually configures these environment variables in the Vercel Project Dashboard:
+
+```env
+AI_PROVIDER=vertex
+VERTEX_API_KEY=<configured_manually_in_vercel>
+VERTEX_MODEL=gemini-2.5-flash
+```
+
+### Platform Compatibility & Constraints
+- **Runtime**: Next.js 16 App Router runs natively on Vercel Serverless Functions (Node.js).
+- **PDF Extraction**: `unpdf` runs purely in-memory in the serverless environment with zero native binary or filesystem dependencies.
+- **Payload Limits**: Vercel Serverless Functions impose a standard request body payload limit of **4.5 MB**. The application file size validation is aligned to **4.5 MB**.
+- **Static Assets**: Bundled sample regulations in `public/sample-docs/` are served statically by Vercel CDN.
+- **Security Rule**: Never commit `.env.local` or `.env.production` files containing real API keys to GitHub.
+
+---
+
+## 12. Testing & Validation
 
 ```bash
-npm test          # Run Vitest unit & adversarial verification tests
+npm test          # Run Vitest unit, secret-safety, and adversarial verification tests
 npm run typecheck # TypeScript type checking
 npm run lint      # ESLint static analysis
 npm run build     # Next.js production build validation

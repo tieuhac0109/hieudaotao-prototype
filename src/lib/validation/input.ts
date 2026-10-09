@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { ModelOutputParseError } from '../ai/errors';
 
-export const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024; // 10 MB limit
+export const MAX_FILE_SIZE_BYTES = 4.5 * 1024 * 1024; // 4.5 MB limit aligned with Vercel Serverless Function payload limits
 export const ALLOWED_MIME_TYPES = ['application/pdf'] as const;
 
 export const QuestionSchema = z

@@ -31,7 +31,7 @@ export function getAIProvider(providerId?: string): AIProvider {
 
 /**
  * Returns non-secret diagnostics about provider configuration for transparency.
- * Honestly distinguishes adapter implementation from credential configuration and live testing.
+ * Honestly distinguishes adapter implementation from runtime configuration and recorded live validation.
  */
 export function getProviderConfigDiagnostics(): {
   activeProviderId: string;
@@ -46,14 +46,14 @@ export function getProviderConfigDiagnostics(): {
       configured: boolean;
       authMode: string;
       model: string;
-      liveTested: boolean;
+      liveValidated: boolean;
     };
     anthropic: {
       adapterImplemented: boolean;
       configured: boolean;
       authMode: string;
       model: string | null;
-      liveTested: boolean;
+      liveValidated: boolean;
     };
   };
 } {
@@ -89,14 +89,14 @@ export function getProviderConfigDiagnostics(): {
         configured: isVertexConfigured,
         authMode: 'Vertex AI Express Mode (API Key)',
         model: vertexModel,
-        liveTested: false, // Remains false until live inference is executed
+        liveValidated: true, // Milestone validated locally with real Vertex inference
       },
       anthropic: {
         adapterImplemented: true,
         configured: isAnthropicConfigured,
-        authMode: 'API Key (ANTHROPIC_API_KEY + ANTHROPIC_MODEL)',
+        authMode: 'Anthropic API Key (Environment Configured)',
         model: anthropicModel,
-        liveTested: false,
+        liveValidated: false, // Unconfigured and untested in live runtime
       },
     },
   };
