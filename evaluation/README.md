@@ -12,6 +12,8 @@ This directory outlines the evaluation methodology, test case schema, and histor
   *First sample-document live validation*: Documents initial local runtime smoke test and single-query verification against the bundled 3-page sample regulation PDF (`quy-che-dao-tao-mau.pdf`).
 - **Real-Document 10-Question Evaluation 01**: [`real-document-evaluation-01.md`](./real-document-evaluation-01.md)  
   *First real-document 10-question evaluation*: Evaluates 10 diverse policy questions against an 18-page public Vietnamese university academic regulation (*Trường Đại học Kinh tế - Đại học Đà Nẵng*, Decision No. 1284/QĐ-ĐHKT). Documents answer accuracy, citation correctness, cross-page verifier limitations, and verifier rejection of wrong-page model citations.
+- **Verifier Improvement Note 01**: [`verifier-improvement-01.md`](./verifier-improvement-01.md)  
+  *Cross-page verification enhancement*: Documents the two-stage boundary-aware evidence verification architecture, safety regression guarantees for wrong-page citations (preserving Case 08 rejection), and comprehensive test suite validation.
 
 ---
 

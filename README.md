@@ -165,10 +165,10 @@ The application UI and API routes contain **no provider-specific business logic*
 HieuDaoTao distinguishes strictly between **model-generated claims** and **server-side verified quotations**:
 
 1. **Model Evidence Output**: The model identifies the source `page` (1-based), `section` (e.g. *Điều 18*), `quotedText`, and `rationale`.
-2. **Server-Side Verification Semantics**:
-   - Safe normalization: Unicode canonical composition (NFC), non-breaking space replacement, whitespace collapsing, curly-to-straight quote mapping, and dash standardization.
-   - Verification rule: The complete quoted passage must exist verbatim on the stated page, or match the exact sequence of substantive words (safe punctuation normalization).
-   - Rejection rule: If the model fabricates a prefix, suffix, adds/removes substantive conditions, or attributes the quote to the wrong page, verification strictly fails (`verified: false`).
+2. **Two-Stage Server-Side Verification Pipeline**:
+   - **Stage A (Declared-Page Verification)**: Verifies the quotation directly against the declared page using safe Unicode normalization (NFC), whitespace collapsing, typographic quote/dash standardization, and full lexical sequence matching.
+   - **Stage B (Adjacent-Page Boundary Verification)**: If Stage A fails, verifies whether the quotation genuinely crosses the boundary between the declared page and its adjacent page (`page N + page N+1` or `page N-1 + page N`). Requires minimum contribution (≥3 lexical tokens on both pages) and exact contiguous sequence matching.
+   - **Strict Rejection Rule**: If the model fabricates a prefix, suffix, alters substantive conditions, or attributes a quote entirely to the wrong page (even if adjacent), verification strictly fails (`verified: false`).
 3. **Visual Transparency**:
    - Quotes that match the source text receive a green `✓ Verified against source` badge.
    - Quotes that cannot be verified automatically receive an amber `⚠ Could not verify quoted passage automatically` badge.
@@ -220,11 +220,8 @@ npm run lint      # ESLint static analysis
 npm run build     # Next.js production build validation
 ```
 
-### Real-Document Evaluation
+### Real-Document Evaluation & Verifier Enhancement
 
-- A 10-question manual evaluation has been completed against an 18-page public Vietnamese university academic regulation.
-- All 10 answers were judged substantively correct against the source regulation.
-- 6/10 questions had all supporting evidence fully verified by the server-side verifier.
-- 3 cases exposed cross-page verification limitations (conservative false negatives where quotes spanned across page boundaries).
-- 1 case exposed wrong-page model attribution that was correctly rejected by the verifier.
-- See detailed report: [`evaluation/real-document-evaluation-01.md`](./evaluation/real-document-evaluation-01.md).
+- **Initial Evaluation (V1)**: A 10-question manual evaluation against an 18-page public Vietnamese university academic regulation judged all 10 answers substantively correct; 6/10 had fully verified evidence, 3 cases exposed cross-page verification limitations, and 1 case exposed wrong-page model attribution that was correctly rejected by the verifier (see [`evaluation/real-document-evaluation-01.md`](./evaluation/real-document-evaluation-01.md)).
+- **Verifier Enhancement**: The verifier now supports conservative adjacent-page boundary verification (Stage B) requiring meaningful contribution (≥3 tokens) from both pages, resolving cross-page false negatives while strictly preserving wrong-page rejection (see [`evaluation/verifier-improvement-01.md`](./evaluation/verifier-improvement-01.md)).
+- **Evaluation Integrity**: The historical V1 evaluation record remains unchanged; official post-fix verification metrics will be reported upon completing a formal re-evaluation pass.

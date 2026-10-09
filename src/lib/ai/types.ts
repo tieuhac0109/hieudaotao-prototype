@@ -34,8 +34,11 @@ export interface RawEvidenceItem {
   rationale?: string;
 }
 
+export type VerificationMode = 'single_page' | 'cross_page_forward' | 'cross_page_backward' | 'unverified';
+
 export interface EvidenceItem extends RawEvidenceItem {
   verified: boolean;
+  verificationMode?: VerificationMode;
 }
 
 export interface RawModelOutput {
